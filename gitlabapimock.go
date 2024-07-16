@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/schema"
 	"github.com/xanzy/go-gitlab"
 )
 
@@ -29,6 +30,7 @@ func NewGitlabApiMock(gitlabMock *GitlabMock) *GitlabApiMock {
 func (mock *GitlabApiMock) CreateServer(addr string) *http.Server {
 	r := mux.NewRouter().PathPrefix(GitlabApiPrefix).Subrouter()
 
+	r.HandleFunc("/users", mock.ListUsersHandler).Methods(http.MethodGet)
 	r.HandleFunc("/groups", mock.ListGroupsHandler).Methods(http.MethodGet)
 	r.HandleFunc("/projects", mock.ListProjectsHandler).Methods(http.MethodGet)
 	r.HandleFunc("/projects/{id}/members", mock.ListAllMembersOfAProjectsHandler).Methods(http.MethodGet)
@@ -42,6 +44,41 @@ func (mock *GitlabApiMock) CreateServer(addr string) *http.Server {
 	}
 
 	return server
+}
+
+// ListUsersHandler implements https://docs.gitlab.com/ee/api/users.html#list-users
+func (mock *GitlabApiMock) ListUsersHandler(responseWriter http.ResponseWriter, request *http.Request) {
+	var listUsersOptions gitlab.ListUsersOptions
+	schema.NewDecoder().Decode(&listUsersOptions, request.URL.Query())
+
+	users := []*gitlab.User{}
+
+	if listUsersOptions.Username != nil {
+		username := *listUsersOptions.Username
+		for _, user := range mock.gitlabMock.users {
+			if user.Username == username {
+				users = append(users, user)
+			}
+		}
+	} else if listUsersOptions.Search != nil {
+		search := *listUsersOptions.Search
+		for _, user := range mock.gitlabMock.users {
+			if user.Email == search || user.Username == search {
+				users = append(users, user)
+			}
+		}
+	} else if mock.gitlabMock.users != nil || len(mock.gitlabMock.users) > 0 {
+		users = mock.gitlabMock.users
+	}
+
+	err := json.NewEncoder(responseWriter).Encode(users)
+	if err != nil {
+		responseWriter.WriteHeader(http.StatusInternalServerError)
+		responseWriter.Write([]byte(err.Error()))
+		return
+	}
+
+	return
 }
 
 // ListGroupsHandler implements https://docs.gitlab.com/ee/api/groups.html#list-groups

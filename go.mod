@@ -4,6 +4,7 @@ go 1.22.5
 
 require (
 	github.com/gorilla/mux v1.8.1
+	github.com/gorilla/schema v1.4.1
 	github.com/stretchr/testify v1.9.0
 	github.com/xanzy/go-gitlab v0.107.0
 )
