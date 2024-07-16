@@ -6,7 +6,7 @@ import (
 
 	"github.com/xanzy/go-gitlab"
 
-	gitlabapimock "github.com/arkadiusjonczek/go-gitlab-api-mock.git"
+	gitlabapimock "github.com/arkadiusjonczek/go-gitlab-api-mock"
 )
 
 var (

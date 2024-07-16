@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/xanzy/go-gitlab"
 
-	gitlabapimock "github.com/arkadiusjonczek/go-gitlab-api-mock.git"
+	gitlabapimock "github.com/arkadiusjonczek/go-gitlab-api-mock"
 )
 
 func Test_Projects_ListProjects_ReturnsEmptyList(t *testing.T) {
