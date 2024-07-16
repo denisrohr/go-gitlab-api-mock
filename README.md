@@ -1,1 +1,3 @@
 # go-gitlab-api-mock
+
+prototype...
