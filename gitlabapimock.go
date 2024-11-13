@@ -34,6 +34,7 @@ func (mock *GitlabApiMock) CreateServer(addr string) *http.Server {
 	r.HandleFunc("/groups", mock.ListGroupsHandler).Methods(http.MethodGet)
 	r.HandleFunc("/projects", mock.ListProjectsHandler).Methods(http.MethodGet)
 	r.HandleFunc("/projects/{id}/members", mock.ListAllMembersOfAProjectsHandler).Methods(http.MethodGet)
+	r.HandleFunc("/projects/{id}/members/all", mock.ListAllMembersOfAProjectsIncludingInheritedHandler).Methods(http.MethodGet)
 	r.HandleFunc("/projects/{id}/members", mock.AddMemberToAProjectsHandler).Methods(http.MethodPost)
 	r.HandleFunc("/projects/{id}/members/{user_id}", mock.EdifMemberOfAProjectHandler).Methods(http.MethodPut)
 	r.HandleFunc("/projects/{id}/members/{user_id}", mock.DeleteMemberFromAProjectHandler).Methods(http.MethodDelete)
@@ -68,7 +69,7 @@ func (mock *GitlabApiMock) ListUsersHandler(responseWriter http.ResponseWriter, 
 			}
 		}
 	} else if mock.gitlabMock.users != nil || len(mock.gitlabMock.users) > 0 {
-		users = mock.gitlabMock.users
+		users = mock.gitlabMock.GetUsers()
 	}
 
 	err := json.NewEncoder(responseWriter).Encode(users)
@@ -77,29 +78,22 @@ func (mock *GitlabApiMock) ListUsersHandler(responseWriter http.ResponseWriter, 
 		responseWriter.Write([]byte(err.Error()))
 		return
 	}
-
-	return
 }
 
 // ListGroupsHandler implements https://docs.gitlab.com/ee/api/groups.html#list-groups
 func (mock *GitlabApiMock) ListGroupsHandler(responseWriter http.ResponseWriter, request *http.Request) {
-	err := json.NewEncoder(responseWriter).Encode(mock.gitlabMock.groups)
+	groups := mock.gitlabMock.GetGroups()
+	err := json.NewEncoder(responseWriter).Encode(groups)
 	if err != nil {
 		responseWriter.WriteHeader(http.StatusInternalServerError)
 		responseWriter.Write([]byte(err.Error()))
 		return
 	}
-
-	return
 }
 
 // ListProjectsHandler implements https://docs.gitlab.com/ee/api/projects.html#list-all-projects
 func (mock *GitlabApiMock) ListProjectsHandler(responseWriter http.ResponseWriter, request *http.Request) {
-	var projects []*gitlab.Project
-
-	for _, group := range mock.gitlabMock.groups {
-		projects = append(projects, group.Projects...)
-	}
+	projects := mock.gitlabMock.GetProjects()
 
 	err := json.NewEncoder(responseWriter).Encode(projects)
 	if err != nil {
@@ -107,8 +101,6 @@ func (mock *GitlabApiMock) ListProjectsHandler(responseWriter http.ResponseWrite
 		responseWriter.Write([]byte(err.Error()))
 		return
 	}
-
-	return
 }
 
 // ListAllMembersOfAProjectsHandler implements https://docs.gitlab.com/ee/api/members.html#list-all-members-of-a-group-or-project
@@ -133,8 +125,35 @@ func (mock *GitlabApiMock) ListAllMembersOfAProjectsHandler(responseWriter http.
 		responseWriter.Write([]byte(err.Error()))
 		return
 	}
+}
 
-	return
+// ListAllMembersOfAProjectsHandler implements https://docs.gitlab.com/ee/api/members.html#list-all-members-of-a-group-or-project-including-inherited-and-invited-members
+func (mock *GitlabApiMock) ListAllMembersOfAProjectsIncludingInheritedHandler(responseWriter http.ResponseWriter, request *http.Request) {
+	vars := mux.Vars(request)
+
+	id := vars["id"]
+	idInteger, _ := strconv.Atoi(id)
+
+	_, projectExists := mock.gitlabMock.projects[idInteger]
+	if !projectExists {
+		responseWriter.WriteHeader(http.StatusNotFound)
+		responseWriter.Write([]byte(http.StatusText(http.StatusNotFound)))
+		return
+	}
+
+	projectMembers, err := mock.gitlabMock.GetProjectMembersWithInheritedGroupMembers(idInteger)
+	if err != nil {
+		responseWriter.WriteHeader(http.StatusInternalServerError)
+		responseWriter.Write([]byte(err.Error()))
+		return
+	}
+
+	err = json.NewEncoder(responseWriter).Encode(projectMembers)
+	if err != nil {
+		responseWriter.WriteHeader(http.StatusInternalServerError)
+		responseWriter.Write([]byte(err.Error()))
+		return
+	}
 }
 
 // AddMemberToAProjectsHandler implements https://docs.gitlab.com/ee/api/members.html#add-a-member-to-a-group-or-project
@@ -187,8 +206,6 @@ func (mock *GitlabApiMock) AddMemberToAProjectsHandler(responseWriter http.Respo
 		responseWriter.Write([]byte(err.Error()))
 		return
 	}
-
-	return
 }
 
 // EdifMemberOfAProjectHandler implements https://docs.gitlab.com/ee/api/members.html#edit-a-member-of-a-group-or-project
@@ -246,8 +263,6 @@ func (mock *GitlabApiMock) EdifMemberOfAProjectHandler(responseWriter http.Respo
 		responseWriter.Write([]byte(err.Error()))
 		return
 	}
-
-	return
 }
 
 // DeleteMemberFromAProjectHandler implements https://docs.gitlab.com/ee/api/members.html#remove-a-member-from-a-group-or-project
@@ -289,6 +304,4 @@ func (mock *GitlabApiMock) DeleteMemberFromAProjectHandler(responseWriter http.R
 	}
 
 	responseWriter.WriteHeader(http.StatusOK)
-
-	return
 }
